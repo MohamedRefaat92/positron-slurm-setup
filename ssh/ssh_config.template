@@ -1,75 +1,32 @@
-# ~/.ssh/config — template for Positron + HPC clusters
-# Copy relevant blocks into your actual ~/.ssh/config.
-# Replace USER, HOSTNAME, and key paths with your own values.
-# ---------------------------------------------------------------------------
+# ~/.ssh/config for Positron on HPC clusters.
+# Copy the blocks you need into your ~/.ssh/config and fill in your usernames.
 
-# ── Global defaults ──────────────────────────────────────────────────────────
+# Defaults for every host
 Host *
-    ServerAliveInterval 60      # keepalive ping every 60 s
-    ServerAliveCountMax 3       # drop connection after 3 missed pings (~3 min)
-    AddKeysToAgent yes          # add key to ssh-agent on first use
-    UseKeychain yes             # macOS: store passphrase in Keychain (remove on Linux)
+    ServerAliveInterval 60          # keep idle connections alive
+    ServerAliveCountMax 3
+    AddKeysToAgent yes
+    IgnoreUnknown UseKeychain       # so the next line doesn't break ssh on Linux
+    UseKeychain yes                 # macOS: keep the key's passphrase in Keychain
     IdentityFile ~/.ssh/id_ed25519
 
-# ── BMRC cluster (Oxford) — 2FA site ─────────────────────────────────────────
-# Positron uses BatchMode=yes and cannot prompt for 2FA interactively.
-# ControlMaster keeps an authenticated socket open; Positron reuses it.
-#
-# Workflow:
-#   1. Open any terminal → ssh bmrc_cluster → complete 2FA
-#   2. Connect from Positron — socket is reused, no auth prompt
+# BMRC login node (2FA). Log in once in a terminal (ssh bmrc_cluster);
+# Positron and later ssh commands reuse that connection.
 Host bmrc_cluster
     HostName cluster1.bmrc.ox.ac.uk
-    User YOUR_BMRC_USERNAME           # e.g. abc123
+    User YOUR_BMRC_USERNAME         # e.g. abc123
     ControlMaster auto
     ControlPath ~/.ssh/cm-%r@%h:%p
     ControlPersist yes
 
-# BMRC compute node, reached through the login node. On the node, a Slurm job
-# runs your own SSH server and writes where it is ("<node> <port>") to
-# ~/.ssh/userd/current_node; this ProxyCommand reads that file and tunnels there.
-# No HostName: the node changes with every job. HostKeyAlias keeps one known_hosts
-# entry for all of them (the server's key is the same on every node).
-# Remote side: remote/README.md. Start a session: remote/positron-compute start
+# BMRC compute node: your own SSH server running in a Slurm job (see remote/).
+# Reads "<node> <port>" from the file the job writes, then tunnels there via the login node.
 Host bmrc_compute
-    User YOUR_BMRC_USERNAME           # e.g. abc123
+    User YOUR_BMRC_USERNAME
     HostKeyAlias bmrc_compute
-    ProxyCommand bash -c 'read -r n p < <(ssh -n bmrc_cluster cat .ssh/userd/current_node 2>/dev/null); [ -n "$p" ] || { echo "No Positron session is running on the cluster. Start one with: positron-compute start" >&2; exit 1; }; exec ssh -W "$n:$p" bmrc_cluster'
+    ProxyCommand bash -c 'read n p < <(ssh -n bmrc_cluster cat .ssh/userd/current_node); exec ssh -W $n:$p bmrc_cluster'
 
-# ── Ludwig cluster — key-only auth ───────────────────────────────────────────
-# Key auth means Positron's BatchMode=yes works directly — no ControlMaster needed.
+# A cluster with key-only login (no 2FA): no ControlMaster needed.
 Host ludwig_cluster
-    HostName YOUR_LUDWIG_HOST         # IP address or host name, e.g. 192.0.2.10
-    User YOUR_LUDWIG_USERNAME         # e.g. jdoe
-
-# ── Hypothetical: university HPC with password + OTP ─────────────────────────
-# Same ControlMaster pattern as BMRC for any 2FA / password-protected site.
-# Host uni_hpc
-#     HostName login.hpc.university.edu
-#     User YOUR_USERNAME
-#     ControlMaster auto
-#     ControlPath ~/.ssh/cm-%r@%h:%p
-#     ControlPersist yes
-
-# ── Hypothetical: AWS ParallelCluster / cloud HPC ────────────────────────────
-# Cloud instances use key-only auth. Optionally use a dedicated key.
-# Host aws_hpc
-#     HostName ec2-XX-XX-XX-XX.compute-1.amazonaws.com
-#     User ec2-user
-#     IdentityFile ~/.ssh/aws_hpc_key     # generate with: ssh-keygen -t ed25519 -f ~/.ssh/aws_hpc_key
-
-# ── Hypothetical: internal cluster behind a bastion / jump host ───────────────
-# ProxyJump tunnels the connection through a public-facing node.
-# Host internal_hpc
-#     HostName 10.0.1.50
-#     User YOUR_USERNAME
-#     ProxyJump bastion.example.com
-
-# ── Hypothetical: cluster requiring a specific port ───────────────────────────
-# Host alt_port_cluster
-#     HostName hpc.example.org
-#     Port 2222
-#     User YOUR_USERNAME
-#     ControlMaster auto
-#     ControlPath ~/.ssh/cm-%r@%h:%p
-#     ControlPersist yes
+    HostName YOUR_LUDWIG_HOST       # IP address or host name
+    User YOUR_LUDWIG_USERNAME
