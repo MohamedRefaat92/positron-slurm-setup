@@ -1,0 +1,72 @@
+# ~/.ssh/config — template for Positron + HPC clusters
+# Copy relevant blocks into your actual ~/.ssh/config.
+# Replace USER, HOSTNAME, and key paths with your own values.
+# ---------------------------------------------------------------------------
+
+# ── Global defaults ──────────────────────────────────────────────────────────
+Host *
+    ServerAliveInterval 60      # keepalive ping every 60 s
+    ServerAliveCountMax 3       # drop connection after 3 missed pings (~3 min)
+    AddKeysToAgent yes          # add key to ssh-agent on first use
+    UseKeychain yes             # macOS: store passphrase in Keychain (remove on Linux)
+    IdentityFile ~/.ssh/id_ed25519
+
+# ── BMRC cluster (Oxford) — 2FA site ─────────────────────────────────────────
+# Positron uses BatchMode=yes and cannot prompt for 2FA interactively.
+# ControlMaster keeps an authenticated socket open; Positron reuses it.
+#
+# Workflow:
+#   1. Open any terminal → ssh bmrc_cluster → complete 2FA
+#   2. Connect from Positron — socket is reused, no auth prompt
+Host bmrc_cluster
+    HostName cluster1.bmrc.ox.ac.uk
+    User YOUR_BMRC_USERNAME           # e.g. abc123
+    ControlMaster auto
+    ControlPath ~/.ssh/cm-%r@%h:%p
+    ControlPersist yes
+
+# BMRC compute node reached via a user-sshd process running in a SLURM job.
+# Requires the remote-side SLURM job to write the node address to
+# ~/.ssh/userd/current_node. See the Remote Setup section of this repo.
+Host bmrc_compute
+    User YOUR_BMRC_USERNAME           # e.g. abc123
+    HostKeyAlias bmrc_compute
+    ProxyCommand bash -c 'read n p < <(ssh -n bmrc_cluster cat .ssh/userd/current_node); exec ssh -W $n:$p bmrc_cluster'
+
+# ── Ludwig cluster — key-only auth ───────────────────────────────────────────
+# Key auth means Positron's BatchMode=yes works directly — no ControlMaster needed.
+Host ludwig_cluster
+    HostName YOUR_LUDWIG_HOST         # IP address or host name, e.g. 192.0.2.10
+    User YOUR_LUDWIG_USERNAME         # e.g. jdoe
+
+# ── Hypothetical: university HPC with password + OTP ─────────────────────────
+# Same ControlMaster pattern as BMRC for any 2FA / password-protected site.
+# Host uni_hpc
+#     HostName login.hpc.university.edu
+#     User YOUR_USERNAME
+#     ControlMaster auto
+#     ControlPath ~/.ssh/cm-%r@%h:%p
+#     ControlPersist yes
+
+# ── Hypothetical: AWS ParallelCluster / cloud HPC ────────────────────────────
+# Cloud instances use key-only auth. Optionally use a dedicated key.
+# Host aws_hpc
+#     HostName ec2-XX-XX-XX-XX.compute-1.amazonaws.com
+#     User ec2-user
+#     IdentityFile ~/.ssh/aws_hpc_key     # generate with: ssh-keygen -t ed25519 -f ~/.ssh/aws_hpc_key
+
+# ── Hypothetical: internal cluster behind a bastion / jump host ───────────────
+# ProxyJump tunnels the connection through a public-facing node.
+# Host internal_hpc
+#     HostName 10.0.1.50
+#     User YOUR_USERNAME
+#     ProxyJump bastion.example.com
+
+# ── Hypothetical: cluster requiring a specific port ───────────────────────────
+# Host alt_port_cluster
+#     HostName hpc.example.org
+#     Port 2222
+#     User YOUR_USERNAME
+#     ControlMaster auto
+#     ControlPath ~/.ssh/cm-%r@%h:%p
+#     ControlPersist yes
