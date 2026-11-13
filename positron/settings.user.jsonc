@@ -1,0 +1,11 @@
+// Positron USER settings for remote HPC work (Settings → Open User Settings (JSON)).
+// Merge these into your existing settings; don't replace the file.
+// Project-specific settings (interpreter discovery) belong in the project's .vscode/settings.json instead.
+{
+  // Use the system ssh and ~/.ssh/config (ControlMaster for 2FA clusters, ProxyCommand to compute nodes).
+  "remoteSSH.transport": "native",
+
+  // Seconds to wait for a new kernel to connect (default 30). On cluster storage a kernel can take
+  // longer to start, and Positron then reports "Request failed with status code 500".
+  "kernelSupervisor.connectionTimeout": 120
+}
