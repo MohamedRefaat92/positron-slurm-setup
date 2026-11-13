@@ -25,13 +25,16 @@ Host bmrc_cluster
     ControlPath ~/.ssh/cm-%r@%h:%p
     ControlPersist yes
 
-# BMRC compute node reached via a user-sshd process running in a SLURM job.
-# Requires the remote-side SLURM job to write the node address to
-# ~/.ssh/userd/current_node. See the Remote Setup section of this repo.
+# BMRC compute node, reached through the login node. On the node, a Slurm job
+# runs your own SSH server and writes where it is ("<node> <port>") to
+# ~/.ssh/userd/current_node; this ProxyCommand reads that file and tunnels there.
+# No HostName: the node changes with every job. HostKeyAlias keeps one known_hosts
+# entry for all of them (the server's key is the same on every node).
+# Remote side: remote/README.md. Start a session: remote/positron-compute start
 Host bmrc_compute
     User YOUR_BMRC_USERNAME           # e.g. abc123
     HostKeyAlias bmrc_compute
-    ProxyCommand bash -c 'read n p < <(ssh -n bmrc_cluster cat .ssh/userd/current_node); exec ssh -W $n:$p bmrc_cluster'
+    ProxyCommand bash -c 'read -r n p < <(ssh -n bmrc_cluster cat .ssh/userd/current_node 2>/dev/null); [ -n "$p" ] || { echo "No Positron session is running on the cluster. Start one with: positron-compute start" >&2; exit 1; }; exec ssh -W "$n:$p" bmrc_cluster'
 
 # ── Ludwig cluster — key-only auth ───────────────────────────────────────────
 # Key auth means Positron's BatchMode=yes works directly — no ControlMaster needed.

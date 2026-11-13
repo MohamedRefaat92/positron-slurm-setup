@@ -113,11 +113,12 @@ Host bmrc_cluster
     ControlPath ~/.ssh/cm-%r@%h:%p
     ControlPersist yes
 
-# BMRC compute node reached via a user-sshd SLURM job (see remote-side setup).
+# BMRC compute node, through the login node, to your own SSH server running in a
+# Slurm job (remote/README.md). Start a session with: remote/positron-compute start
 Host bmrc_compute
     User ${BMRC_USER}
     HostKeyAlias bmrc_compute
-    ProxyCommand bash -c 'read n p < <(ssh -n bmrc_cluster cat .ssh/userd/current_node); exec ssh -W \$n:\$p bmrc_cluster'
+    ProxyCommand bash -c 'read -r n p < <(ssh -n bmrc_cluster cat .ssh/userd/current_node 2>/dev/null); [ -n "\$p" ] || { echo "No Positron session is running on the cluster. Start one with: positron-compute start" >&2; exit 1; }; exec ssh -W "\$n:\$p" bmrc_cluster'
 
 # ── Ludwig cluster ────────────────────────────────────────────────────────────
 Host ludwig_cluster
@@ -161,3 +162,6 @@ echo "     Complete 2FA — this opens the shared control socket."
 echo "  2. Connect from Positron — it reuses the socket, no 2FA needed."
 echo "  3. For clusters with key-only auth (Ludwig, cloud), Positron connects"
 echo "     directly without a pre-opened terminal session."
+echo ""
+echo "To run Positron on a compute node instead of the login node, continue with"
+echo "remote/README.md (one-time setup: remote/positron-compute setup)."

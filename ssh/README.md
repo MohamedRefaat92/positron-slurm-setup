@@ -143,10 +143,12 @@ BMRC (and many clusters) only expose the login node externally. To connect Posit
 Host bmrc_compute
     User YOUR_USERNAME             # e.g. abc123
     HostKeyAlias bmrc_compute
-    ProxyCommand bash -c 'read n p < <(ssh -n bmrc_cluster cat .ssh/userd/current_node); exec ssh -W $n:$p bmrc_cluster'
+    ProxyCommand bash -c 'read -r n p < <(ssh -n bmrc_cluster cat .ssh/userd/current_node 2>/dev/null); [ -n "$p" ] || { echo "No Positron session is running on the cluster. Start one with: positron-compute start" >&2; exit 1; }; exec ssh -W "$n:$p" bmrc_cluster'
 ```
 
-This reads the compute node address from a file your SLURM job writes, then tunnels through the login node. The remote-side setup for this is covered in the **Remote Setup** section of this repo.
+This reads the compute node's address from a file your Slurm job writes, then tunnels through the login node. If no job is running, it says so instead of failing with a cryptic error. The `-n` matters: without it, the inner `ssh` swallows the start of the connection and you get `Bad packet length`.
+
+The cluster side (the job that runs the SSH server and writes that file) is in [`remote/`](../remote/README.md).
 
 ### Other common patterns
 
